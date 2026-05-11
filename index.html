@@ -410,6 +410,17 @@
     }
     .add-metro-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+    /* ── Tempo name ───────────────────────────────────── */
+    .tempo-name {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--accent);
+      text-align: center;
+      height: 16px;
+      transition: opacity 0.2s;
+    }
+
     /* ── Volume bar ───────────────────────────────────── */
     .vol-bar {
       display: flex;
@@ -528,6 +539,8 @@
 <div id="tab-single" class="tab-content active">
 
   <div class="beat-row" id="beat-row"></div>
+
+  <div class="tempo-name" id="tempo-name">Moderato</div>
 
   <div class="dial-wrap" id="dial-wrap">
     <svg class="dial-svg" id="dial-svg" viewBox="0 0 290 290">
@@ -871,8 +884,36 @@ function adjBPM(delta) {
 
 function clampBPM(v) { return Math.min(300, Math.max(20, Math.round(v))); }
 
+const TEMPO_MARKS = [
+  [20,  'Larghissimo'],
+  [25,  'Grave'],
+  [45,  'Largo'],
+  [60,  'Larghetto'],
+  [66,  'Adagio'],
+  [76,  'Adagietto'],
+  [80,  'Andante'],
+  [108, 'Andantino'],
+  [112, 'Moderato'],
+  [120, 'Allegretto'],
+  [132, 'Allegro'],
+  [168, 'Vivace'],
+  [176, 'Vivacissimo'],
+  [188, 'Presto'],
+  [200, 'Prestissimo'],
+];
+
+function tempoName(bpm) {
+  let name = TEMPO_MARKS[0][1];
+  for (const [threshold, label] of TEMPO_MARKS) {
+    if (bpm >= threshold) name = label;
+    else break;
+  }
+  return name;
+}
+
 function refreshBPM(bpm) {
   document.getElementById('bpm-display').textContent = bpm;
+  document.getElementById('tempo-name').textContent  = tempoName(bpm);
   updateDial(bpm);
 }
 
