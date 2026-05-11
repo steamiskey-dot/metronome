@@ -754,8 +754,23 @@ let audioCtx = null;
 
 function getAC() {
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-  if (audioCtx.state === 'suspended') audioCtx.resume();
   return audioCtx;
+}
+
+// iOS requires AudioContext to be resumed AND a silent buffer played
+// inside a direct user-gesture call stack before any real sound works.
+async function ensureAudio() {
+  const ac = getAC();
+  if (ac.state !== 'running') {
+    await ac.resume();
+    // Play a zero-length silent buffer — this fully unlocks iOS audio
+    const buf = ac.createBuffer(1, 1, ac.sampleRate);
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(ac.destination);
+    src.start(0);
+  }
+  return ac;
 }
 
 // ── Master volume ─────────────────────────────────────
@@ -918,11 +933,11 @@ function togglePlay() {
   S.playing ? stopSingle() : startSingle();
 }
 
-function startSingle() {
-  getAC();
+async function startSingle() {
+  await ensureAudio();
   S.playing = true;
   S.beat = -1; S.sub = 0;
-  S.nextTime = audioCtx.currentTime + 0.05;
+  S.nextTime = audioCtx.currentTime + 0.1;
   document.getElementById('play-btn').textContent = '■';
   scheduleSingle();
 }
@@ -1190,21 +1205,21 @@ function removeMetronome(id) {
 
 function findMetro(id) { return metros.find(m => m.id === id); }
 
-function toggleMultiPlay(id) {
+async function toggleMultiPlay(id) {
   const m = findMetro(id);
   if (!m) return;
   if (m.playing) {
     stopMetro(m);
   } else {
-    getAC();
+    await ensureAudio();
     let start;
     if (lockSync) {
       if (syncAnchor === null || syncAnchor < audioCtx.currentTime) {
-        syncAnchor = audioCtx.currentTime + 0.05;
+        syncAnchor = audioCtx.currentTime + 0.1;
       }
       start = syncAnchor;
     } else {
-      start = audioCtx.currentTime + 0.05;
+      start = audioCtx.currentTime + 0.1;
     }
     startMetro(m, start);
   }
@@ -1340,17 +1355,17 @@ function renderMultiList() {
   updateStartAllBtn();
 }
 
-function toggleAllMetronomes() {
+async function toggleAllMetronomes() {
   const anyPlaying = metros.some(m => m.playing);
-  getAC();
   if (anyPlaying) {
     metros.forEach(m => stopMetro(m));
   } else {
+    await ensureAudio();
     if (lockSync) {
-      syncAnchor = audioCtx.currentTime + 0.05;
+      syncAnchor = audioCtx.currentTime + 0.1;
       metros.forEach(m => startMetro(m, syncAnchor));
     } else {
-      metros.forEach(m => startMetro(m, audioCtx.currentTime + 0.05));
+      metros.forEach(m => startMetro(m, audioCtx.currentTime + 0.1));
     }
   }
   renderMultiList();
@@ -1492,6 +1507,9 @@ makePicker('picker-subdiv',
 
 addMetronome();
 addMetronome();
+
+// Pre-unlock Web Audio on first touch — iOS needs this before play is pressed
+document.addEventListener('touchstart', () => ensureAudio(), { once: true, passive: true });
 </script>
 
 <script>
