@@ -507,51 +507,65 @@
       line-height: 150px;
     }
 
-    /* ── Volume bar ───────────────────────────────────── */
+    /* ── Volume bar (fixed footer) ────────────────────── */
     .vol-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0; right: 0;
       display: flex;
       align-items: center;
-      gap: 12px;
-      width: 100%;
-      padding: 14px 18px;
+      gap: 14px;
+      padding: 14px 24px;
+      padding-bottom: max(16px, env(safe-area-inset-bottom));
       background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 12px;
+      border-top: 1px solid var(--border);
+      z-index: 50;
     }
 
-    .vol-label {
-      font-size: 10px;
-      letter-spacing: 0.16em;
-      text-transform: uppercase;
+    .vol-icon {
+      font-size: 15px;
       color: var(--text-muted);
-      white-space: nowrap;
-      min-width: 28px;
+      flex-shrink: 0;
+      line-height: 1;
+    }
+
+    .vol-pct {
+      font-size: 11px;
+      font-family: 'Courier New', Courier, monospace;
+      color: var(--text-muted);
+      min-width: 36px;
+      text-align: right;
+      flex-shrink: 0;
     }
 
     .vol-slider {
       flex: 1;
       -webkit-appearance: none;
       appearance: none;
-      height: 4px;
-      border-radius: 2px;
+      height: 5px;
+      border-radius: 3px;
       background: var(--surface2);
       outline: none;
       cursor: pointer;
     }
     .vol-slider::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 20px; height: 20px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       background: var(--accent);
       cursor: pointer;
+      box-shadow: 0 2px 8px rgba(232,100,58,0.4);
     }
     .vol-slider::-moz-range-thumb {
-      width: 20px; height: 20px;
+      width: 32px; height: 32px;
       border-radius: 50%;
       background: var(--accent);
       border: none;
       cursor: pointer;
     }
+
+    /* Push tab content up so the fixed bar doesn't cover it */
+    .tab-content { padding-bottom: max(100px, calc(env(safe-area-inset-bottom) + 80px)); }
 
     /* ── Start All button ─────────────────────────────── */
     .start-all-btn {
@@ -626,6 +640,13 @@
   </style>
 </head>
 <body>
+
+<div class="vol-bar">
+  <span class="vol-icon">🔈</span>
+  <input class="vol-slider" id="vol-slider" type="range" min="0" max="100" value="80"
+    oninput="setVolume(this.value)">
+  <span class="vol-pct" id="vol-pct">80%</span>
+</div>
 
 <div class="credit">
   programmed by<br>
@@ -708,12 +729,6 @@
     </div>
   </div>
 
-  <div class="vol-bar">
-    <span class="vol-label">Vol</span>
-    <input class="vol-slider" id="vol-single" type="range" min="0" max="100" value="80"
-      oninput="setVolume(this.value)">
-    <span class="vol-label" id="vol-pct-single">80%</span>
-  </div>
 
 </div>
 
@@ -736,13 +751,6 @@
   <div class="multi-list" id="multi-list"></div>
 
   <button class="add-metro-btn" onclick="addMetronome()">+ Add Metronome</button>
-
-  <div class="vol-bar">
-    <span class="vol-label">Vol</span>
-    <input class="vol-slider" id="vol-multi" type="range" min="0" max="100" value="80"
-      oninput="setVolume(this.value)">
-    <span class="vol-label" id="vol-pct-multi">80%</span>
-  </div>
 
 </div>
 
@@ -790,15 +798,10 @@ function getMasterGain() {
 function setVolume(val) {
   masterVol = val / 100;
   if (_masterGain) _masterGain.gain.value = masterVol;
-  // Keep both sliders in sync
-  ['vol-single','vol-multi'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.value = val;
-  });
-  ['vol-pct-single','vol-pct-multi'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.textContent = Math.round(val) + '%';
-  });
+  const slider = document.getElementById('vol-slider');
+  if (slider) slider.value = val;
+  const pct = document.getElementById('vol-pct');
+  if (pct) pct.textContent = Math.round(val) + '%';
 }
 
 // ── Tone selection ────────────────────────────────────
