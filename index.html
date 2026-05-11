@@ -410,6 +410,75 @@
     }
     .add-metro-btn:hover { border-color: var(--accent); color: var(--accent); }
 
+    /* ── Volume bar ───────────────────────────────────── */
+    .vol-bar {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      width: 100%;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .vol-label {
+      font-size: 10px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      white-space: nowrap;
+      min-width: 28px;
+    }
+
+    .vol-slider {
+      flex: 1;
+      -webkit-appearance: none;
+      appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface2);
+      outline: none;
+      cursor: pointer;
+    }
+    .vol-slider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .vol-slider::-moz-range-thumb {
+      width: 20px; height: 20px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+    }
+
+    /* ── Start All button ─────────────────────────────── */
+    .start-all-btn {
+      width: 100%;
+      padding: 15px;
+      background: var(--accent);
+      border: none;
+      border-radius: 12px;
+      color: #fff;
+      font-size: 13px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.15s, box-shadow 0.15s;
+      box-shadow: 0 4px 20px rgba(232,100,58,0.3);
+    }
+    .start-all-btn:hover { background: var(--accent2); }
+    .start-all-btn.stopping {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      box-shadow: none;
+    }
+
     /* ── Tone selector ────────────────────────────────── */
     .tone-wrap {
       display: flex;
@@ -512,6 +581,13 @@
     </div>
   </div>
 
+  <div class="vol-bar">
+    <span class="vol-label">Vol</span>
+    <input class="vol-slider" id="vol-single" type="range" min="0" max="100" value="80"
+      oninput="setVolume(this.value)">
+    <span class="vol-label" id="vol-pct-single">80%</span>
+  </div>
+
 </div>
 
 <!-- ═══════════ MULTI TAB ═══════════ -->
@@ -528,9 +604,18 @@
     </label>
   </div>
 
+  <button class="start-all-btn" id="start-all-btn" onclick="toggleAllMetronomes()">▶ Start All</button>
+
   <div class="multi-list" id="multi-list"></div>
 
   <button class="add-metro-btn" onclick="addMetronome()">+ Add Metronome</button>
+
+  <div class="vol-bar">
+    <span class="vol-label">Vol</span>
+    <input class="vol-slider" id="vol-multi" type="range" min="0" max="100" value="80"
+      oninput="setVolume(this.value)">
+    <span class="vol-label" id="vol-pct-multi">80%</span>
+  </div>
 
 </div>
 
@@ -546,16 +631,44 @@ function getAC() {
   return audioCtx;
 }
 
+// ── Master volume ─────────────────────────────────────
+let _masterGain = null;
+let masterVol   = 0.8;
+
+function getMasterGain() {
+  const ac = getAC();
+  if (!_masterGain) {
+    _masterGain = ac.createGain();
+    _masterGain.gain.value = masterVol;
+    _masterGain.connect(ac.destination);
+  }
+  return _masterGain;
+}
+
+function setVolume(val) {
+  masterVol = val / 100;
+  if (_masterGain) _masterGain.gain.value = masterVol;
+  // Keep both sliders in sync
+  ['vol-single','vol-multi'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = val;
+  });
+  ['vol-pct-single','vol-pct-multi'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = Math.round(val) + '%';
+  });
+}
+
 // ── Tone selection ────────────────────────────────────
 let currentTone = 'thud';
 function setTone(val) { currentTone = val; }
 
-// Shared compressor to keep all tones at consistent volume
+// Shared compressor (routes through master gain)
 function makeComp(ac) {
   const c = ac.createDynamicsCompressor();
   c.threshold.value = -8; c.knee.value = 8;
   c.ratio.value = 5; c.attack.value = 0.002; c.release.value = 0.12;
-  c.connect(ac.destination);
+  c.connect(getMasterGain());
   return c;
 }
 
@@ -597,7 +710,7 @@ function toneClick(ac, time, isAccent, vol) {
   gain.gain.setValueAtTime(0, time);
   gain.gain.linearRampToValueAtTime(peak, time + 0.001);
   gain.gain.exponentialRampToValueAtTime(0.001, time + 0.055);
-  osc.connect(gain); gain.connect(ac.destination);
+  osc.connect(gain); gain.connect(getMasterGain());
   osc.start(time); osc.stop(time + 0.06);
 }
 
@@ -613,7 +726,7 @@ function toneWood(ac, time, isAccent, vol) {
     gain.gain.setValueAtTime(0, time);
     gain.gain.linearRampToValueAtTime(peak * (i === 0 ? 1 : 0.45), time + 0.002);
     gain.gain.exponentialRampToValueAtTime(0.001, time + 0.1);
-    osc.connect(gain); gain.connect(ac.destination);
+    osc.connect(gain); gain.connect(getMasterGain());
     osc.start(time); osc.stop(time + 0.12);
   });
 }
@@ -628,7 +741,7 @@ function toneBeep(ac, time, isAccent, vol) {
   gain.gain.setValueAtTime(0, time);
   gain.gain.linearRampToValueAtTime(peak, time + 0.003);
   gain.gain.exponentialRampToValueAtTime(0.001, time + 0.14);
-  osc.connect(gain); gain.connect(ac.destination);
+  osc.connect(gain); gain.connect(getMasterGain());
   osc.start(time); osc.stop(time + 0.16);
 }
 
@@ -645,7 +758,7 @@ function toneRim(ac, time, isAccent, vol) {
   gain.gain.setValueAtTime(0, time);
   gain.gain.linearRampToValueAtTime(peak, time + 0.001);
   gain.gain.exponentialRampToValueAtTime(0.001, time + 0.065);
-  noise.connect(bp); bp.connect(gain); gain.connect(ac.destination);
+  noise.connect(bp); bp.connect(gain); gain.connect(getMasterGain());
   noise.start(time); noise.stop(time + 0.08);
 }
 
@@ -921,6 +1034,7 @@ function removeMetronome(id) {
   if (m) stopMetro(m);
   metros = metros.filter(m => m.id !== id);
   renderMultiList();
+  updateStartAllBtn();
 }
 
 function findMetro(id) { return metros.find(m => m.id === id); }
@@ -944,6 +1058,7 @@ function toggleMultiPlay(id) {
     startMetro(m, start);
   }
   rerenderCard(m);
+  updateStartAllBtn();
 }
 
 function startMetro(m, startTime) {
@@ -1071,6 +1186,32 @@ function renderMultiList() {
   const list = document.getElementById('multi-list');
   list.innerHTML = '';
   metros.forEach(m => list.appendChild(buildCard(m)));
+  updateStartAllBtn();
+}
+
+function toggleAllMetronomes() {
+  const anyPlaying = metros.some(m => m.playing);
+  getAC();
+  if (anyPlaying) {
+    metros.forEach(m => stopMetro(m));
+  } else {
+    if (lockSync) {
+      syncAnchor = audioCtx.currentTime + 0.05;
+      metros.forEach(m => startMetro(m, syncAnchor));
+    } else {
+      metros.forEach(m => startMetro(m, audioCtx.currentTime + 0.05));
+    }
+  }
+  renderMultiList();
+}
+
+function updateStartAllBtn() {
+  const btn = document.getElementById('start-all-btn');
+  if (!btn) return;
+  const anyPlaying = metros.some(m => m.playing);
+  const allPlaying = metros.length > 0 && metros.every(m => m.playing);
+  btn.textContent = anyPlaying ? '■ Stop All' : '▶ Start All';
+  btn.classList.toggle('stopping', anyPlaying);
 }
 
 // ══════════════════════════════════════════════════════
