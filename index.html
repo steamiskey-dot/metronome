@@ -576,6 +576,26 @@
       box-shadow: none;
     }
 
+    /* ── Credit tag ───────────────────────────────────── */
+    .credit {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      right: 12px;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 9px;
+      letter-spacing: 0.04em;
+      color: #333;
+      line-height: 1.4;
+      text-align: right;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .credit span {
+      display: block;
+      color: #2a6e2a;
+    }
+
     /* ── Tone selector ────────────────────────────────── */
     .tone-wrap {
       display: flex;
@@ -606,6 +626,11 @@
   </style>
 </head>
 <body>
+
+<div class="credit">
+  programmed by<br>
+  <span>Ceallachan</span>
+</div>
 
 <div class="tabs">
   <button class="tab-btn active" onclick="switchTab('single')">Metronome</button>
