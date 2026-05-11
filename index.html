@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Metronome</title>
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0d0d0d">
+
+  <!-- iOS PWA -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Metronome">
+  <link rel="apple-touch-icon" href="icons/icon.svg">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0d0d0d;
+      --surface: #181818;
+      --surface2: #222;
+      --accent: #e8643a;
+      --accent2: #c04e28;
+      --text: #f0f0f0;
+      --text-muted: #777;
+      --border: #2e2e2e;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-bottom: max(40px, env(safe-area-inset-bottom));
+      padding-top: env(safe-area-inset-top);
+    }
+
+    /* ── Tabs ─────────────────────────────────────────── */
+    .tabs {
+      display: flex;
+      width: 100%;
+      max-width: 500px;
+      border-bottom: 1px solid var(--border);
+      margin-top: 20px;
+    }
+
+    .tab-btn {
+      flex: 1;
+      padding: 13px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+    .tab-content {
+      display: none;
+      width: 100%;
+      max-width: 500px;
+      padding: 28px 20px;
+    }
+
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 30px;
+    }
+
+    /* ── Beat dots ────────────────────────────────────── */
+    .beat-row {
+      display: flex;
+      gap: 12px;
+      justify-content: center;
+      height: 18px;
+    }
+
+    .beat-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      transition: background 0.04s, box-shadow 0.04s;
+    }
+
+    .beat-dot.active { background: #c8c8c8; border-color: #c8c8c8; }
+    .beat-dot.accent {
+      background: var(--accent);
+      border-color: var(--accent);
+      box-shadow: 0 0 10px rgba(232,100,58,0.55);
+    }
+
+    /* ── Circular dial ────────────────────────────────── */
+    .dial-wrap {
+      position: relative;
+      width: 290px;
+      height: 290px;
+      user-select: none;
+      touch-action: none;
+    }
+
+    .dial-svg {
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    .dial-svg:active { cursor: grabbing; }
+
+    .dial-center {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      pointer-events: none;
+    }
+
+    .dial-bpm-val {
+      font-size: 62px;
+      font-weight: 200;
+      line-height: 1;
+      letter-spacing: -3px;
+    }
+
+    .dial-bpm-unit {
+      font-size: 11px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      margin-top: 5px;
+    }
+
+    /* ── Main controls ────────────────────────────────── */
+    .controls-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+    }
+
+    .btn-adj {
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-size: 16px;
+      font-weight: 300;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+    .btn-adj:hover { background: #2c2c2c; }
+
+    .play-btn {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      color: #fff;
+      font-size: 26px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s, transform 0.1s;
+      box-shadow: 0 4px 24px rgba(232,100,58,0.38);
+    }
+    .play-btn:hover { background: var(--accent2); }
+    .play-btn:active { transform: scale(0.94); }
+
+    /* ── Tap ──────────────────────────────────────────── */
+    .tap-btn {
+      padding: 10px 28px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 28px;
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: background 0.1s;
+    }
+    .tap-btn:active { background: #303030; }
+
+    /* ── Chip selectors ───────────────────────────────── */
+    .section-label {
+      font-size: 10px;
+      letter-spacing: 0.18em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      text-align: center;
+      margin-bottom: 9px;
+    }
+
+    .chip-row {
+      display: flex;
+      gap: 7px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .chip {
+      padding: 6px 15px;
+      border-radius: 22px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+    }
+    .chip:hover { color: var(--text); }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+    /* ── Multi metronome ──────────────────────────────── */
+    .sync-bar {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 13px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+    }
+
+    .sync-label { font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--text-muted); }
+
+    .sync-state { font-size: 11px; color: var(--text-muted); margin-left: 8px; }
+    .sync-state.on { color: var(--accent); }
+
+    .toggle {
+      position: relative;
+      width: 46px;
+      height: 26px;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute;
+      inset: 0;
+      background: var(--surface2);
+      border-radius: 26px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      transition: background 0.2s, border-color 0.2s;
+    }
+    .toggle-track:before {
+      content: '';
+      position: absolute;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--text-muted);
+      top: 2px;
+      left: 2px;
+      transition: transform 0.2s, background 0.2s;
+    }
+    .toggle input:checked + .toggle-track { background: rgba(232,100,58,0.15); border-color: var(--accent); }
+    .toggle input:checked + .toggle-track:before { transform: translateX(20px); background: var(--accent); }
+
+    .multi-list {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+    }
+
+    .metro-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 16px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+
+    .metro-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .metro-card-name {
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+    }
+
+    .card-btns { display: flex; gap: 7px; }
+
+    .btn-sm {
+      padding: 5px 13px;
+      border-radius: 16px;
+      font-size: 11px;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--surface2);
+      color: var(--text-muted);
+      transition: background 0.15s, color 0.15s;
+    }
+    .btn-sm:hover { color: var(--text); }
+    .btn-sm.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .btn-sm.muted { background: #2a2020; border-color: #5a3030; color: #e87a7a; }
+    .btn-sm.remove { border-color: #3a2020; color: #884444; }
+    .btn-sm.remove:hover { background: #2a1a1a; color: #e85858; }
+
+    .mini-bpm-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .mini-bpm-block { min-width: 52px; }
+
+    .mini-bpm-val {
+      font-size: 30px;
+      font-weight: 200;
+      line-height: 1;
+    }
+
+    .mini-bpm-lbl {
+      font-size: 9px;
+      letter-spacing: 0.18em;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-top: 3px;
+    }
+
+    .bpm-range {
+      flex: 1;
+      -webkit-appearance: none;
+      height: 4px;
+      border-radius: 2px;
+      background: var(--surface2);
+      outline: none;
+      cursor: pointer;
+    }
+    .bpm-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      cursor: pointer;
+    }
+    .bpm-range::-moz-range-thumb {
+      width: 18px;
+      height: 18px;
+      border-radius: 50%;
+      background: var(--accent);
+      border: none;
+      cursor: pointer;
+    }
+
+    .mini-opts-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .mini-beat-row {
+      display: flex;
+      gap: 8px;
+    }
+
+    .mini-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      transition: background 0.04s;
+    }
+    .mini-dot.active { background: #b0b0b0; border-color: #b0b0b0; }
+    .mini-dot.accent { background: var(--accent); border-color: var(--accent); box-shadow: 0 0 6px rgba(232,100,58,0.5); }
+
+    .add-metro-btn {
+      width: 100%;
+      padding: 15px;
+      background: none;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+      color: var(--text-muted);
+      font-size: 12px;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      cursor: pointer;
+      transition: border-color 0.2s, color 0.2s;
+    }
+    .add-metro-btn:hover { border-color: var(--accent); color: var(--accent); }
+  </style>
+</head>
+<body>
+
+<div class="tabs">
+  <button class="tab-btn active" onclick="switchTab('single')">Metronome</button>
+  <button class="tab-btn" onclick="switchTab('multi')">Multi</button>
+</div>
+
+<!-- ═══════════ SINGLE TAB ═══════════ -->
+<div id="tab-single" class="tab-content active">
+
+  <div class="beat-row" id="beat-row"></div>
+
+  <div class="dial-wrap" id="dial-wrap">
+    <svg class="dial-svg" id="dial-svg" viewBox="0 0 290 290">
+      <!-- Background track -->
+      <circle cx="145" cy="145" r="122" fill="none" stroke="#1e1e1e" stroke-width="9"/>
+      <!-- Fill arc -->
+      <path id="dial-arc" fill="none" stroke="url(#arcGrad)" stroke-width="9" stroke-linecap="round"/>
+      <!-- Tick marks -->
+      <g id="dial-ticks"></g>
+      <!-- Thumb dot -->
+      <circle id="dial-thumb" r="11" fill="#e8643a" cx="145" cy="23"/>
+      <defs>
+        <radialGradient id="arcGrad" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#f08050"/>
+          <stop offset="100%" stop-color="#e8643a"/>
+        </radialGradient>
+      </defs>
+    </svg>
+    <div class="dial-center">
+      <div class="dial-bpm-val" id="bpm-display">120</div>
+      <div class="dial-bpm-unit">BPM</div>
+    </div>
+  </div>
+
+  <div class="controls-row">
+    <button class="btn-adj" title="-5" onclick="adjBPM(-5)">−−</button>
+    <button class="btn-adj" title="-1" onclick="adjBPM(-1)">−</button>
+    <button class="play-btn" id="play-btn" onclick="togglePlay()">▶</button>
+    <button class="btn-adj" title="+1" onclick="adjBPM(1)">+</button>
+    <button class="btn-adj" title="+5" onclick="adjBPM(5)">++</button>
+  </div>
+
+  <button class="tap-btn" onclick="tapTempo()">Tap Tempo</button>
+
+  <div style="width:100%">
+    <div class="section-label">Time Signature</div>
+    <div class="chip-row" id="timesig-row">
+      <button class="chip active" onclick="setTimeSig(this,4)">4/4</button>
+      <button class="chip" onclick="setTimeSig(this,3)">3/4</button>
+      <button class="chip" onclick="setTimeSig(this,2)">2/4</button>
+      <button class="chip" onclick="setTimeSig(this,6)">6/8</button>
+    </div>
+  </div>
+
+  <div style="width:100%">
+    <div class="section-label">Subdivision</div>
+    <div class="chip-row" id="subdiv-row">
+      <button class="chip active" onclick="setSubdiv(this,1)">Quarter</button>
+      <button class="chip" onclick="setSubdiv(this,2)">Eighth</button>
+      <button class="chip" onclick="setSubdiv(this,4)">Sixteenth</button>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════ MULTI TAB ═══════════ -->
+<div id="tab-multi" class="tab-content">
+
+  <div class="sync-bar">
+    <div style="display:flex;align-items:center;gap:8px">
+      <span class="sync-label">Lock Sync</span>
+      <span class="sync-state" id="sync-state">Off</span>
+    </div>
+    <label class="toggle">
+      <input type="checkbox" id="lock-sync-toggle" onchange="toggleLockSync(this)">
+      <span class="toggle-track"></span>
+    </label>
+  </div>
+
+  <div class="multi-list" id="multi-list"></div>
+
+  <button class="add-metro-btn" onclick="addMetronome()">+ Add Metronome</button>
+
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  Audio engine
+// ══════════════════════════════════════════════════════
+let audioCtx = null;
+
+function getAC() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function playThud(time, isAccent, vol = 1.0) {
+  const ac = getAC();
+  const freq  = isAccent ? 105 : 75;
+  const peak  = isAccent ? 1.3 * vol : 0.9 * vol;
+
+  const osc  = ac.createOscillator();
+  const gain = ac.createGain();
+  const comp = ac.createDynamicsCompressor();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, time);
+  osc.frequency.exponentialRampToValueAtTime(freq * 0.38, time + 0.09);
+
+  gain.gain.setValueAtTime(0, time);
+  gain.gain.linearRampToValueAtTime(peak, time + 0.004);
+  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.22);
+
+  comp.threshold.value = -8;
+  comp.knee.value = 8;
+  comp.ratio.value = 5;
+  comp.attack.value = 0.002;
+  comp.release.value = 0.12;
+
+  osc.connect(gain);
+  gain.connect(comp);
+  comp.connect(ac.destination);
+  osc.start(time);
+  osc.stop(time + 0.25);
+}
+
+// ══════════════════════════════════════════════════════
+//  Single metronome state
+// ══════════════════════════════════════════════════════
+const S = {
+  bpm: 120, beats: 4, subdiv: 1,
+  playing: false,
+  beat: -1, sub: 0,
+  nextTime: 0,
+  timer: null,
+  LOOKAHEAD: 0.25,
+  INTERVAL: 80, // ms
+};
+
+function togglePlay() {
+  S.playing ? stopSingle() : startSingle();
+}
+
+function startSingle() {
+  getAC();
+  S.playing = true;
+  S.beat = -1; S.sub = 0;
+  S.nextTime = audioCtx.currentTime + 0.05;
+  document.getElementById('play-btn').textContent = '■';
+  scheduleSingle();
+}
+
+function stopSingle() {
+  S.playing = false;
+  clearTimeout(S.timer);
+  document.getElementById('play-btn').textContent = '▶';
+  S.beat = -1;
+  flashBeat(-1, S.beats);
+}
+
+function scheduleSingle() {
+  if (!S.playing) return;
+  const ac = getAC();
+  const beatLen  = 60 / S.bpm;
+  const subdivLen = beatLen / S.subdiv;
+
+  while (S.nextTime < ac.currentTime + S.LOOKAHEAD) {
+    const onMain = (S.sub % S.subdiv === 0);
+    if (onMain) {
+      S.beat = (S.beat + 1) % S.beats;
+      playThud(S.nextTime, S.beat === 0);
+      scheduleVisual(S.nextTime, S.beat);
+    } else {
+      playThud(S.nextTime, false, 0.4);
+    }
+    S.sub = (S.sub + 1) % S.subdiv;
+    S.nextTime += subdivLen;
+  }
+  S.timer = setTimeout(scheduleSingle, S.INTERVAL);
+}
+
+function scheduleVisual(time, beat) {
+  const delay = Math.max(0, (time - audioCtx.currentTime) * 1000);
+  setTimeout(() => { if (S.playing) flashBeat(beat, S.beats); }, delay);
+}
+
+function flashBeat(active, total) {
+  document.querySelectorAll('#beat-row .beat-dot').forEach((d, i) => {
+    d.classList.remove('active','accent');
+    if (i === active) d.classList.add(i === 0 ? 'accent' : 'active');
+  });
+}
+
+function buildBeatRow(n) {
+  const row = document.getElementById('beat-row');
+  row.innerHTML = '';
+  for (let i = 0; i < n; i++) {
+    const d = document.createElement('div');
+    d.className = 'beat-dot';
+    row.appendChild(d);
+  }
+}
+
+function setTimeSig(el, n) {
+  S.beats = n; S.beat = -1;
+  document.querySelectorAll('#timesig-row .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  buildBeatRow(n);
+}
+
+function setSubdiv(el, n) {
+  S.subdiv = n; S.sub = 0;
+  document.querySelectorAll('#subdiv-row .chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+}
+
+function adjBPM(delta) {
+  S.bpm = clampBPM(S.bpm + delta);
+  refreshBPM(S.bpm);
+}
+
+function clampBPM(v) { return Math.min(300, Math.max(20, Math.round(v))); }
+
+function refreshBPM(bpm) {
+  document.getElementById('bpm-display').textContent = bpm;
+  updateDial(bpm);
+}
+
+// ══════════════════════════════════════════════════════
+//  Tap tempo
+// ══════════════════════════════════════════════════════
+let taps = [];
+let tapTimer = null;
+
+function tapTempo() {
+  const now = performance.now();
+  taps.push(now);
+  if (taps.length > 8) taps.shift();
+  clearTimeout(tapTimer);
+  tapTimer = setTimeout(() => { taps = []; }, 2200);
+
+  if (taps.length >= 2) {
+    let sum = 0;
+    for (let i = 1; i < taps.length; i++) sum += taps[i] - taps[i-1];
+    const avg = sum / (taps.length - 1);
+    S.bpm = clampBPM(60000 / avg);
+    refreshBPM(S.bpm);
+  }
+}
+
+// ══════════════════════════════════════════════════════
+//  Circular dial
+// ══════════════════════════════════════════════════════
+const BPM_MIN = 20, BPM_MAX = 300;
+const CX = 145, CY = 145, R = 122;
+// 270° sweep, 135° start (bottom-left) → clockwise to 45° (bottom-right)
+// Using top = 0°, clockwise positive. Start at 135°, end at 405° (= 45°).
+const ANG_START = 135; // degrees from top, clockwise
+const ANG_RANGE = 270;
+
+function bpmToAngleDeg(bpm) {
+  const t = (bpm - BPM_MIN) / (BPM_MAX - BPM_MIN);
+  return ANG_START + t * ANG_RANGE;
+}
+
+function polarXY(deg, r) {
+  const rad = (deg - 90) * Math.PI / 180; // offset so 0°=top
+  return { x: CX + r * Math.cos(rad), y: CY + r * Math.sin(rad) };
+}
+
+function buildDialTicks() {
+  const g = document.getElementById('dial-ticks');
+  const marks = [40,60,80,100,120,140,160,180,200,240,280];
+  marks.forEach(bpm => {
+    const ang = bpmToAngleDeg(bpm);
+    const p1 = polarXY(ang, R - 10);
+    const p2 = polarXY(ang, R - 20);
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
+    line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
+    line.setAttribute('stroke', bpm % 60 === 0 ? '#555' : '#383838');
+    line.setAttribute('stroke-width', bpm % 60 === 0 ? '2' : '1');
+    g.appendChild(line);
+  });
+}
+
+function updateDial(bpm) {
+  const angDeg = bpmToAngleDeg(bpm);
+  const startPt = polarXY(ANG_START, R);
+  const endPt   = polarXY(angDeg, R);
+  const sweep = angDeg - ANG_START;
+  const large = sweep > 180 ? 1 : 0;
+
+  let d = '';
+  if (bpm > BPM_MIN + 1) {
+    d = `M ${startPt.x.toFixed(2)} ${startPt.y.toFixed(2)} A ${R} ${R} 0 ${large} 1 ${endPt.x.toFixed(2)} ${endPt.y.toFixed(2)}`;
+  }
+  document.getElementById('dial-arc').setAttribute('d', d);
+  document.getElementById('dial-thumb').setAttribute('cx', endPt.x);
+  document.getElementById('dial-thumb').setAttribute('cy', endPt.y);
+}
+
+// Drag
+let dragging = false;
+
+document.getElementById('dial-svg').addEventListener('mousedown',  e => { e.preventDefault(); dragging = true; });
+document.getElementById('dial-svg').addEventListener('touchstart', e => { e.preventDefault(); dragging = true; }, { passive:false });
+
+function handleDialMove(clientX, clientY) {
+  if (!dragging) return;
+  const rect = document.getElementById('dial-svg').getBoundingClientRect();
+  const dx = clientX - (rect.left + rect.width / 2);
+  const dy = clientY - (rect.top + rect.height / 2);
+  // Angle from top (0=up), clockwise
+  let deg = Math.atan2(dx, -dy) * 180 / Math.PI; // -180..180
+  // Remap: our arc goes 135→405(=45°). Normalize so 0 = ANG_START.
+  let rel = deg - ANG_START; // relative to start
+  if (rel < -180) rel += 360;
+  if (rel > 360) rel -= 360;
+  rel = Math.max(0, Math.min(ANG_RANGE, rel));
+  const bpm = clampBPM(BPM_MIN + (rel / ANG_RANGE) * (BPM_MAX - BPM_MIN));
+  S.bpm = bpm;
+  refreshBPM(bpm);
+}
+
+document.addEventListener('mousemove',  e => handleDialMove(e.clientX, e.clientY));
+document.addEventListener('touchmove',  e => { e.preventDefault(); handleDialMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive:false });
+document.addEventListener('mouseup',    () => { dragging = false; });
+document.addEventListener('touchend',   () => { dragging = false; });
+
+// ══════════════════════════════════════════════════════
+//  Multi metronome
+// ══════════════════════════════════════════════════════
+let metros = [];
+let lockSync = false;
+let syncAnchor = null; // shared start time when locked
+let nextId = 0;
+
+function toggleLockSync(checkbox) {
+  lockSync = checkbox.checked;
+  const stateEl = document.getElementById('sync-state');
+  stateEl.textContent = lockSync ? 'On' : 'Off';
+  stateEl.className = 'sync-state' + (lockSync ? ' on' : '');
+
+  if (lockSync) {
+    const anyPlaying = metros.some(m => m.playing);
+    if (anyPlaying) {
+      getAC();
+      syncAnchor = audioCtx.currentTime + 0.05;
+      metros.forEach(m => { if (m.playing) resyncMetro(m); });
+    }
+  }
+}
+
+function addMetronome() {
+  const m = {
+    id: ++nextId, bpm: 120, beats: 4,
+    playing: false, muted: false,
+    beat: -1, nextTime: 0, timer: null,
+  };
+  metros.push(m);
+  renderMultiList();
+}
+
+function removeMetronome(id) {
+  const m = findMetro(id);
+  if (m) stopMetro(m);
+  metros = metros.filter(m => m.id !== id);
+  renderMultiList();
+}
+
+function findMetro(id) { return metros.find(m => m.id === id); }
+
+function toggleMultiPlay(id) {
+  const m = findMetro(id);
+  if (!m) return;
+  if (m.playing) {
+    stopMetro(m);
+  } else {
+    getAC();
+    let start;
+    if (lockSync) {
+      if (syncAnchor === null || syncAnchor < audioCtx.currentTime) {
+        syncAnchor = audioCtx.currentTime + 0.05;
+      }
+      start = syncAnchor;
+    } else {
+      start = audioCtx.currentTime + 0.05;
+    }
+    startMetro(m, start);
+  }
+  rerenderCard(m);
+}
+
+function startMetro(m, startTime) {
+  m.playing = true;
+  m.beat = -1;
+  m.nextTime = startTime;
+  scheduleMetro(m);
+}
+
+function stopMetro(m) {
+  m.playing = false;
+  clearTimeout(m.timer);
+  m.beat = -1;
+  flashMiniBeat(m.id, -1, m.beats);
+}
+
+function resyncMetro(m) {
+  clearTimeout(m.timer);
+  m.beat = -1;
+  m.nextTime = syncAnchor;
+  scheduleMetro(m);
+}
+
+function scheduleMetro(m) {
+  if (!m.playing) return;
+  const ac = getAC();
+  const beatLen = 60 / m.bpm;
+
+  while (m.nextTime < ac.currentTime + 0.25) {
+    m.beat = (m.beat + 1) % m.beats;
+    if (!m.muted) playThud(m.nextTime, m.beat === 0);
+    const snap = { id: m.id, beat: m.beat, beats: m.beats, time: m.nextTime };
+    const delay = Math.max(0, (snap.time - ac.currentTime) * 1000);
+    setTimeout(() => { if (m.playing) flashMiniBeat(snap.id, snap.beat, snap.beats); }, delay);
+    m.nextTime += beatLen;
+  }
+  m.timer = setTimeout(() => scheduleMetro(m), 80);
+}
+
+function flashMiniBeat(id, active, total) {
+  const row = document.getElementById(`mbeat-${id}`);
+  if (!row) return;
+  row.querySelectorAll('.mini-dot').forEach((d, i) => {
+    d.classList.remove('active','accent');
+    if (i === active) d.classList.add(i === 0 ? 'accent' : 'active');
+  });
+}
+
+function setMultiBPM(id, val) {
+  const m = findMetro(id);
+  if (!m) return;
+  m.bpm = parseInt(val);
+  const el = document.getElementById(`mbpm-${id}`);
+  if (el) el.textContent = m.bpm;
+}
+
+function setMultiBeats(id, n, el) {
+  const m = findMetro(id);
+  if (!m) return;
+  m.beats = n; m.beat = -1;
+  el.closest('.mini-opts-row').querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  const row = document.getElementById(`mbeat-${id}`);
+  if (row) row.innerHTML = Array(n).fill(0).map(() => `<div class="mini-dot"></div>`).join('');
+}
+
+function toggleMute(id) {
+  const m = findMetro(id);
+  if (!m) return;
+  m.muted = !m.muted;
+  rerenderCard(m);
+}
+
+function rerenderCard(m) {
+  const card = document.getElementById(`mcard-${m.id}`);
+  if (!card) return;
+  const newCard = buildCard(m);
+  card.replaceWith(newCard);
+}
+
+function buildCard(m) {
+  const card = document.createElement('div');
+  card.className = 'metro-card';
+  card.id = `mcard-${m.id}`;
+
+  card.innerHTML = `
+    <div class="metro-card-header">
+      <span class="metro-card-name">Metronome ${m.id}</span>
+      <div class="card-btns">
+        <button class="btn-sm ${m.muted ? 'muted' : ''}" onclick="toggleMute(${m.id})">
+          ${m.muted ? 'Unmute' : 'Mute'}
+        </button>
+        <button class="btn-sm ${m.playing ? 'on' : ''}" onclick="toggleMultiPlay(${m.id})">
+          ${m.playing ? '■ Stop' : '▶ Play'}
+        </button>
+        <button class="btn-sm remove" onclick="removeMetronome(${m.id})">✕</button>
+      </div>
+    </div>
+
+    <div class="mini-bpm-row">
+      <div class="mini-bpm-block">
+        <div class="mini-bpm-val" id="mbpm-${m.id}">${m.bpm}</div>
+        <div class="mini-bpm-lbl">BPM</div>
+      </div>
+      <input class="bpm-range" type="range" min="20" max="300" value="${m.bpm}"
+        oninput="setMultiBPM(${m.id}, this.value)">
+    </div>
+
+    <div class="mini-opts-row">
+      <span style="font-size:10px;letter-spacing:0.14em;text-transform:uppercase;color:var(--text-muted);margin-right:2px">Beats</span>
+      ${[2,3,4,6].map(b =>
+        `<button class="chip ${m.beats===b?'active':''}" style="padding:4px 11px;font-size:11px"
+          onclick="setMultiBeats(${m.id},${b},this)">${b}</button>`
+      ).join('')}
+    </div>
+
+    <div class="mini-beat-row" id="mbeat-${m.id}">
+      ${Array(m.beats).fill(0).map(() => `<div class="mini-dot"></div>`).join('')}
+    </div>
+  `;
+  return card;
+}
+
+function renderMultiList() {
+  const list = document.getElementById('multi-list');
+  list.innerHTML = '';
+  metros.forEach(m => list.appendChild(buildCard(m)));
+}
+
+// ══════════════════════════════════════════════════════
+//  Tab switching
+// ══════════════════════════════════════════════════════
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    b.classList.toggle('active', (tab==='single' && i===0)||(tab==='multi' && i===1));
+  });
+  document.getElementById('tab-single').classList.toggle('active', tab==='single');
+  document.getElementById('tab-multi').classList.toggle('active', tab==='multi');
+}
+
+// ══════════════════════════════════════════════════════
+//  Init
+// ══════════════════════════════════════════════════════
+buildBeatRow(4);
+buildDialTicks();
+updateDial(120);
+addMetronome();
+addMetronome();
+</script>
+
+<script>
+// ── Service Worker registration ───────────────────────
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .catch(err => console.warn('SW registration failed:', err));
+  });
+}
+</script>
+</body>
+</html>

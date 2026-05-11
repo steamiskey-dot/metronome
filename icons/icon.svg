@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="96" fill="#0d0d0d"/>
+  <!-- Depth ring -->
+  <circle cx="256" cy="256" r="210" fill="none" stroke="#151515" stroke-width="4"/>
+  <!-- Track arc 270° dark -->
+  <path d="M 380 380 A 175 175 0 1 1 380 132" fill="none" stroke="#252525" stroke-width="28" stroke-linecap="round"/>
+  <!-- Orange arc ~200° sweep (dial at roughly 220 BPM position) -->
+  <path d="M 380 380 A 175 175 0 1 1 182 97" fill="none" stroke="#e8643a" stroke-width="28" stroke-linecap="round"/>
+  <!-- Thumb -->
+  <circle cx="182" cy="97" r="24" fill="#e8643a"/>
+  <!-- Beat dots -->
+  <circle cx="196" cy="336" r="15" fill="#e8643a"/>
+  <circle cx="240" cy="336" r="12" fill="#2a2a2a"/>
+  <circle cx="280" cy="336" r="12" fill="#2a2a2a"/>
+  <circle cx="320" cy="336" r="12" fill="#2a2a2a"/>
+  <!-- BPM number -->
+  <text x="256" y="246" text-anchor="middle" fill="#f0f0f0" font-size="90" font-weight="200"
+        font-family="'Segoe UI',system-ui,sans-serif">120</text>
+  <!-- BPM label -->
+  <text x="256" y="288" text-anchor="middle" fill="#555" font-size="28"
+        font-family="'Segoe UI',system-ui,sans-serif" letter-spacing="10">BPM</text>
+</svg>
