@@ -715,33 +715,50 @@ function updateDial(bpm) {
   document.getElementById('dial-thumb').setAttribute('cy', endPt.y);
 }
 
-// Drag
+// Drag — delta-based so there is no dead zone and no position snapping
 let dragging = false;
+let lastDragAngle = null;
+let preciseBPM = 120; // float precision to avoid rounding drift
 
-document.getElementById('dial-svg').addEventListener('mousedown',  e => { e.preventDefault(); dragging = true; });
-document.getElementById('dial-svg').addEventListener('touchstart', e => { e.preventDefault(); dragging = true; }, { passive:false });
-
-function handleDialMove(clientX, clientY) {
-  if (!dragging) return;
+function dialAngle(clientX, clientY) {
   const rect = document.getElementById('dial-svg').getBoundingClientRect();
   const dx = clientX - (rect.left + rect.width / 2);
   const dy = clientY - (rect.top + rect.height / 2);
-  // Angle from top (0=up), clockwise
-  let deg = Math.atan2(dx, -dy) * 180 / Math.PI; // -180..180
-  // Remap: our arc goes 135→405(=45°). Normalize so 0 = ANG_START.
-  let rel = deg - ANG_START; // relative to start
-  if (rel < -180) rel += 360;
-  if (rel > 360) rel -= 360;
-  rel = Math.max(0, Math.min(ANG_RANGE, rel));
-  const bpm = clampBPM(BPM_MIN + (rel / ANG_RANGE) * (BPM_MAX - BPM_MIN));
-  S.bpm = bpm;
-  refreshBPM(bpm);
+  return Math.atan2(dx, -dy) * 180 / Math.PI; // 0=top, clockwise, -180..180
 }
+
+function startDrag(e) {
+  e.preventDefault();
+  dragging = true;
+  preciseBPM = S.bpm;
+  const pt = e.touches ? e.touches[0] : e;
+  lastDragAngle = dialAngle(pt.clientX, pt.clientY);
+}
+
+function handleDialMove(clientX, clientY) {
+  if (!dragging || lastDragAngle === null) return;
+  const angle = dialAngle(clientX, clientY);
+
+  // Delta angle, handling the ±180° wrap cleanly
+  let delta = angle - lastDragAngle;
+  if (delta > 180)  delta -= 360;
+  if (delta < -180) delta += 360;
+  lastDragAngle = angle;
+
+  // 270° arc spans the full BPM range
+  const bpmPerDeg = (BPM_MAX - BPM_MIN) / ANG_RANGE;
+  preciseBPM = Math.min(BPM_MAX, Math.max(BPM_MIN, preciseBPM + delta * bpmPerDeg));
+  S.bpm = Math.round(preciseBPM);
+  refreshBPM(S.bpm);
+}
+
+document.getElementById('dial-svg').addEventListener('mousedown',  startDrag);
+document.getElementById('dial-svg').addEventListener('touchstart', startDrag, { passive: false });
 
 document.addEventListener('mousemove',  e => handleDialMove(e.clientX, e.clientY));
 document.addEventListener('touchmove',  e => { e.preventDefault(); handleDialMove(e.touches[0].clientX, e.touches[0].clientY); }, { passive:false });
-document.addEventListener('mouseup',    () => { dragging = false; });
-document.addEventListener('touchend',   () => { dragging = false; });
+document.addEventListener('mouseup',    () => { dragging = false; lastDragAngle = null; });
+document.addEventListener('touchend',   () => { dragging = false; lastDragAngle = null; });
 
 // ══════════════════════════════════════════════════════
 //  Multi metronome
